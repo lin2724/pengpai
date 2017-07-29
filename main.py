@@ -247,8 +247,8 @@ class PPArticlePageNode(PPPageNode):
         news_txt_node = root.xpath('//div[@class="newscontent"]/div[@class="news_txt"]')
 
         self.title = self.filter_title(title_node[0].text)
-        #self.title = title_node[0].text
-        print self.title
+
+        #print self.title
         self.get_pic_from_content()
         store_new_article(self.get_parent_node().get_parent_node(), self.get_parent_node(), self)
         pass
@@ -394,7 +394,7 @@ def store_new_article(channel_unit_node, channel_node, article_node):
         os.mkdir(folder_path)
 
     file_name = os.path.join(folder_path, article_name + '.html')
-    print 'Create article [%s]' % file_name
+    #print 'Create article [%s]' % file_name
     with open(file_name, 'w+') as fd:
         fd.write(article_node.get_content())
 
@@ -509,12 +509,8 @@ def test():
 
 
 if __name__ == '__main__':
-
-    #do_test_get_channels()
     test()
     exit(0)
-    #do_get_article_list_from_list('25448')
-
     pass
 
 
