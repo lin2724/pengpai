@@ -248,7 +248,6 @@ class PPArticlePageNode(PPPageNode):
 
         self.title = self.filter_title(title_node[0].text)
 
-        #print self.title
         self.get_pic_from_content()
         store_new_article(self.get_parent_node().get_parent_node(), self.get_parent_node(), self)
         pass
@@ -378,48 +377,54 @@ def check_if_exist(channel_unit_node, channel_node, article_node):
 
 def store_new_article(channel_unit_node, channel_node, article_node):
     global gLocalStoreFolder
-    if not os.path.exists(gLocalStoreFolder):
-        os.mkdir(gLocalStoreFolder)
+    try:
+        if not os.path.exists(gLocalStoreFolder):
+            os.mkdir(gLocalStoreFolder)
 
-    folder_path = os.path.join(gLocalStoreFolder,  '%d-%s' % (channel_unit_node.get_self_id(), channel_unit_node.get_title()))
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        folder_path = os.path.join(gLocalStoreFolder,  '%d-%s' % (channel_unit_node.get_self_id(), channel_unit_node.get_title()))
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
 
-    folder_path = os.path.join(folder_path, '%s-%s' % (channel_node.get_self_id(), channel_node.get_title()))
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
-    article_name = '%d-%s' % (article_node.get_self_id(), article_node.get_title())
-    folder_path = os.path.join(folder_path, article_name)
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        folder_path = os.path.join(folder_path, '%s-%s' % (channel_node.get_self_id(), channel_node.get_title()))
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+        article_name = '%d-%s' % (article_node.get_self_id(), article_node.get_title())
+        folder_path = os.path.join(folder_path, article_name)
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
 
-    file_name = os.path.join(folder_path, article_name + '.html')
-    #print 'Create article [%s]' % file_name
-    with open(file_name, 'w+') as fd:
-        fd.write(article_node.get_content())
+        file_name = os.path.join(folder_path, article_name + '.html')
+
+        with open(file_name, 'w+') as fd:
+            fd.write(article_node.get_content())
+    except IOError:
+        print 'ERROR: Failed to store new article'
 
 
 def store_new_article_file(channel_unit_node, channel_node, article_node, file_name, content):
     global gLocalStoreFolder
-    if not os.path.exists(gLocalStoreFolder):
-        os.mkdir(gLocalStoreFolder)
+    try:
+        if not os.path.exists(gLocalStoreFolder):
+            os.mkdir(gLocalStoreFolder)
 
-    folder_path = os.path.join(gLocalStoreFolder,  '%d-%s' % (channel_unit_node.get_self_id(), channel_unit_node.get_title()))
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        folder_path = os.path.join(gLocalStoreFolder,  '%d-%s' % (channel_unit_node.get_self_id(), channel_unit_node.get_title()))
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
 
-    folder_path = os.path.join(folder_path, '%s-%s' % (channel_node.get_self_id(), channel_node.get_title()))
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
-    article_name = '%d-%s' % (article_node.get_self_id(), article_node.get_title())
-    folder_path = os.path.join(folder_path, article_name)
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        folder_path = os.path.join(folder_path, '%s-%s' % (channel_node.get_self_id(), channel_node.get_title()))
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+        article_name = '%d-%s' % (article_node.get_self_id(), article_node.get_title())
+        folder_path = os.path.join(folder_path, article_name)
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
 
-    full_file_path = os.path.join(folder_path, file_name)
-    print 'Create file [%s]' % full_file_path
-    with open(full_file_path, 'wb+') as fd:
-        fd.write(content)
+        full_file_path = os.path.join(folder_path, file_name)
+        print 'Create file [%s]' % full_file_path
+        with open(full_file_path, 'wb+') as fd:
+            fd.write(content)
+    except IOError:
+        print 'ERROR: Failed to store new article file'
 
 
 def get_article(channel_node, list_node, article_node):
