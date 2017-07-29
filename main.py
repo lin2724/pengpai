@@ -397,7 +397,7 @@ def store_new_article(channel_unit_node, channel_node, article_node):
 
         with open(file_name, 'w+') as fd:
             fd.write(article_node.get_content())
-    except IOError:
+    except :
         print 'ERROR: Failed to store new article'
 
 
@@ -420,10 +420,10 @@ def store_new_article_file(channel_unit_node, channel_node, article_node, file_n
             os.mkdir(folder_path)
 
         full_file_path = os.path.join(folder_path, file_name)
-        print 'Create file [%s]' % full_file_path
+        #print 'Create file [%s]' % full_file_path
         with open(full_file_path, 'wb+') as fd:
             fd.write(content)
-    except IOError:
+    except :
         print 'ERROR: Failed to store new article file'
 
 
