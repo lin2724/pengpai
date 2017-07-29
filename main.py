@@ -123,6 +123,9 @@ class PPPageNode:
     def get_title(self):
         return self.title
 
+    def set_title(self, title):
+        self.title = self.filter_title(title)
+
     def get_url(self):
         return self.url
 
@@ -140,7 +143,7 @@ class PPPageNode:
     def filter_title(self, title):
         valid_title = ''
         for idx, char in enumerate(title):
-            if char >= '0':
+            if '0' <= char <= '9' or 'A' <= char <= 'Z' or 'a' <= char <= 'z' or 127 < char:
                 valid_title += char
         if not len(valid_title):
             valid_title = 'buggytitle'
