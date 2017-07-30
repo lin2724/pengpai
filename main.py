@@ -6,6 +6,7 @@ from lxml import etree
 from lxml import html
 from io import StringIO
 
+
 class ScrapLogin:
     def __init__(self):
         self.set_log_url = ''
@@ -266,9 +267,7 @@ class PPArticlePageNode(PPPageNode):
         img_nodes = news_txt_nodes[0].xpath('.//img[@src]')
         for idx, img_node in enumerate(img_nodes):
             img_url = img_node.attrib['src']
-            print img_url
             img_name = os.path.basename(img_url)
-            print img_name
             url2content_handle = ScrapUrls2Content()
             img_content = url2content_handle.run_parse(img_url)
             if len(img_content):
@@ -309,22 +308,6 @@ def do_test_get_channels():
     write_content(str(ret_list), 'items.txt')
     return ret_list
 
-
-def do_get_article_list_from_list(list_id):
-    page_id = 0
-    start_url = 'http://www.thepaper.cn/load_index.jsp?nodeids=%s,&topCids=1739701&pageidx=%d' % (list_id, page_id)
-    url2content_handle = ScrapUrls2Content()
-    content = url2content_handle.run_parse(start_url)
-    write_content(content, 'article_list.html')
-    root = etree.HTML(content)
-    nodes = root.xpath('//div[@class="news_li"]/h2/a')
-    for node in nodes:
-        item_dict = dict()
-        item_dict['url'] = node.attrib['href']
-        item_dict['title'] = node.text
-        print item_dict['url']
-        print item_dict['title'].encode('utf-8')
-    pass
 
 gLocalStoreFolder = 'PengPaiArticle'
 
@@ -427,56 +410,7 @@ def store_new_article_file(channel_unit_node, channel_node, article_node, file_n
         print 'ERROR: Failed to store new article file'
 
 
-def get_article(channel_node, list_node, article_node):
-
-    start_url = 'http://www.thepaper.cn/%s' % (article_node['url'])
-    url2content_handle = ScrapUrls2Content()
-    content = url2content_handle.run_parse(start_url)
-    if not content:
-        print 'Empty content'
-        return False
-    write_content(content, 'article_list.html')
-    root = etree.HTML(content)
-    title_node = root.xpath('//div[@class="newscontent"]/h1[@class="news_title"]')
-    news_about_node = root.xpath('//div[@class="newscontent"]/div[@class="news_about"]')
-    news_txt_node = root.xpath('//div[@class="newscontent"]/div[@class="news_txt"]')
-
-    ret_dict = dict()
-    ret_dict['title'] = title_node[0].text
-    ret_dict['auth'] = news_about_node[0][0].text
-    ret_dict['time'] = news_about_node[0][1].text
-    print len(news_txt_node)
-    article_content = ''
-    ret_dict['text'] = news_txt_node[0].text
-    article_content+=news_txt_node[0].text
-    print len(news_txt_node[0])
-    print news_txt_node[0].attrib
-    for node in news_txt_node[0]:
-        if node.text:
-            article_content+='\n'
-            article_content+=node.text
-            print node.text
-
-    print ret_dict['title']
-    print ret_dict['auth']
-    print ret_dict['time']
-    write_content(article_content.encode('utf-8'), 'article.txt')
-    if check_if_exist(channel_node, list_node, article_node):
-        print 'Already exist'
-    store_new_article(channel_node, list_node, article_node)
-    pass
-
-
-def do_get_list_from_channel(channel_url):
-    start_url = 'http://www.thepaper.cn/channel_25953'
-    pass
-
-
 # front-page  channel-unit  channel  article-list-in-channel
-
-def choose_channel_init(items):
-
-    pass
 
 
 def choose_node(node):
@@ -499,7 +433,7 @@ def choose_node(node):
     pass
 
 
-def test():
+def main():
     front_page_node = PPFrontPageNode()
     front_page_node.init_node('http://www.thepaper.cn/', u'澎湃')
     front_page_node.do_parse()
@@ -514,7 +448,7 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    main()
     exit(0)
     pass
 
