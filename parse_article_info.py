@@ -161,19 +161,30 @@ def collect_all_files(folder):
 
 
 def collect_all_info(dict_list):
+    new_info_parser = InfoParser()
     for dict_item in dict_list:
         file_path = dict_item['file_path']
         article_id = dict_item['id']
-
+        with open(file_path, 'r') as fd:
+            content = fd.read()
+            dict_info = new_info_parser.do_parse(article_id, content)
+            store_info(dict_info)
     pass
 
 def store_info(dict_item):
+    article_info = dict_item
     store_file_name = 'info.txt'
     if not os.path.exists(store_file_name):
         with open(store_file_name, 'w+') as fd:
             fd.write('#######\n')
     with open(store_file_name, 'a') as fd:
-        fd.write()
+        fd.write(str(article_info.article_id) + '\t'
+                 + article_info.title.encode('utf-8') + '\t'
+                 + article_info.about.encode('utf-8') + '\t'
+                 + article_info.time.encode('utf-8') + '\t'
+                 + article_info.source.encode('utf-8') + '\t'
+                 + article_info.editor.encode('utf-8')  + '\t'
+                 + article_info.keyword.encode('utf-8') + '\n')
 
 def test():
     new_info_parser = InfoParser()
@@ -183,7 +194,8 @@ def test():
     pass
 
 if __name__ == '__main__':
-    collect_all_info('.')
+    file_list = collect_all_files('.')
+    collect_all_info(file_list)
     # test()
 
 
