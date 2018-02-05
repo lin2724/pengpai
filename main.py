@@ -1,11 +1,15 @@
 # coding=utf-8
 import os
 import re
+import sys
 import requests
 from lxml import etree
 from lxml import html
 from io import StringIO
+from common_lib import MyArgParse
+from common_lib import LogHandle
 
+gstLogHandle = LogHandle('pengpai.log')
 
 class ScrapLogin:
     def __init__(self):
@@ -247,7 +251,10 @@ class PPArticlePageNode(PPPageNode):
         news_about_node = root.xpath('//div[@class="newscontent"]/div[@class="news_about"]')
         news_txt_node = root.xpath('//div[@class="newscontent"]/div[@class="news_txt"]')
 
-        self.title = self.filter_title(title_node[0].text)
+        if len(title_node):
+            self.title = self.filter_title(title_node[0].text)
+        else:
+            self.title = 'None'
 
         self.get_pic_from_content()
         store_new_article(self.get_parent_node().get_parent_node(), self.get_parent_node(), self)
@@ -380,8 +387,8 @@ def store_new_article(channel_unit_node, channel_node, article_node):
 
         with open(file_name, 'w+') as fd:
             fd.write(article_node.get_content())
-    except :
-        print 'ERROR: Failed to store new article'
+    except:
+        print 'ERROR: Failed to store new article [%s]' % str(sys.exc_info())
 
 
 def store_new_article_file(channel_unit_node, channel_node, article_node, file_name, content):
@@ -413,30 +420,93 @@ def store_new_article_file(channel_unit_node, channel_node, article_node, file_n
 # front-page  channel-unit  channel  article-list-in-channel
 
 
-def choose_node(node):
+def choose_node(node, input_idx=None):
     sub_nodes = node.get_sub_nodes()
     for idx, sub_node in enumerate(sub_nodes):
-        print str(idx) + ':' + sub_node.get_title()
+        print(str(idx) + ':' + sub_node.get_title())
     if not len(sub_nodes):
-        print 'ERROR: no channel found...'
+        gstLogHandle.log('ERROR: no channel found...')
         return None
     while True:
-        num = raw_input('choose channel unit-->')
+        if input_idx:
+            num = input_idx
+        else:
+            num = raw_input('choose channel unit-->')
         try:
             num = int(num)
             if num > len(sub_nodes):
-                print 'wrong choice! try again.'
+                if not input_idx:
+                    gstLogHandle.log('Wrong choice for id [%d]' % num)
+                    return None
+                gstLogHandle.log('wrong choice! try again.')
+                continue
+            print('choose [%d]:[%s]' % (num, sub_nodes[num].get_title()))
             break
         except ValueError:
-            print 'Please input number..'
+            gstLogHandle.log('Please input number..')
     return sub_nodes[num]
+    pass
+
+def init_arg_parser(argv):
+    arg_parse = MyArgParse()
+    arg_parse.add_option('-parse', [2], 'parse channel, you must to input channle and sub-channel')
+    arg_parse.add_option('-parse_all', [0], 'parse all channel & all articles')
+    arg_parse.add_option('-d', 1, 'where to store those articles')
+    arg_parse.add_option('-h', 0, 'print help')
+    arg_parse.parse(argv)
+    return arg_parse
     pass
 
 
 def main():
+    arg_parser = init_arg_parser(sys.argv)
+    if arg_parser.check_option('-h'):
+        print (arg_parser)
+        exit(0)
     front_page_node = PPFrontPageNode()
     front_page_node.init_node('http://www.thepaper.cn/', u'澎湃')
     front_page_node.do_parse()
+
+    if arg_parser.check_option('-d'):
+        gLocalStoreFolder = arg_parser.get_option_args('-d')[0]
+        gstLogHandle.log('Set Store path to [%s]' % gLocalStoreFolder)
+        pass
+
+    if arg_parser.check_option('-parse'):
+        channle_id = int(arg_parser.get_option_args('-parse')[0])
+        sub_channel_id = int(arg_parser.get_option_args('-parse')[1])
+        channel_unit_node = choose_node(front_page_node, channle_id)
+        if not channel_unit_node:
+            exit(1)
+        channel_node = choose_node(channel_unit_node, sub_channel_id)
+        if not channel_node:
+            exit(1)
+        channel_node.do_parse()
+        article_nodes = channel_node.get_sub_nodes()
+        print 'len [%d]' % len(article_nodes)
+        for article_node in article_nodes:
+            article_node.do_parse()
+        exit(0)
+        pass
+
+    if arg_parser.check_option('-parse_all'):
+        channel_unit_nodes = front_page_node.get_sub_nodes()
+        for idx, channel_unit_node in enumerate(channel_unit_nodes):
+            print('Start to get ' + str(idx) + ':' + channel_unit_node.get_title())
+            if 0 == idx:
+                print 'Skip video channel..'
+                continue
+            for sub_idx, channel_node in enumerate(channel_unit_node.get_sub_nodes()):
+                channel_node.do_parse()
+                article_nodes = channel_node.get_sub_nodes()
+                print('Start to get ' + str(idx) + ':' + channel_node.get_title())
+                print('Total Article cnt [%d]' % len(article_nodes))
+                for article_node in article_nodes:
+                    article_node.do_parse()
+        exit(0)
+        pass
+
+
 
     channel_unit_node = choose_node(front_page_node)
     channel_node = choose_node(channel_unit_node)
