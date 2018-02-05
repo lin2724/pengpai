@@ -18,7 +18,6 @@ class ScrapLogin:
         self.set_cookie_file_name = 'cookie'
         self.set_domain = 'new'
         self.set_config_path = ''
-
         pass
 
     def do_login(self):
@@ -62,13 +61,14 @@ class ScrapContent2Urls:
 
 class ScrapUrls2Content:
     def __init__(self):
+        self.set_timeout = 60
         pass
 
     def load_urls(self):
         pass
 
     def run_parse(self, url=None):
-        r = requests.get(url)
+        r = requests.get(url, timeout=self.set_timeout)
         return r.content
         pass
 
