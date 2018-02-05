@@ -170,11 +170,15 @@ class PPFrontPageNode(PPPageNode):
         for channel_unit_tr_node in channel_unit_tr_nodes:
             a_nodes = channel_unit_tr_node.xpath('a[@class="bn_a"]')
             if len(a_nodes):
-                channel_unit_node = PPChannelUnitPageNode()
-                url = start_url + a_nodes[0].attrib['href']
-                title = a_nodes[0].text
-                channel_unit_node.init_node(url, title)
-                self.add_sub_node(channel_unit_node)
+                try:
+                    channel_unit_node = PPChannelUnitPageNode()
+                    url = start_url + a_nodes[0].attrib['href']
+                    title = a_nodes[0].text
+                    channel_unit_node.init_node(url, title)
+                    self.add_sub_node(channel_unit_node)
+                except IndexError:
+                    print 'Page content not expected at [%s]' % start_url
+                    continue
             else:
                 continue
             sub_channel_tr_nodes = channel_unit_tr_node.xpath('div/ul[@class="clearfix"]/li/a')
@@ -271,7 +275,11 @@ class PPArticlePageNode(PPPageNode):
     def get_pic_from_content(self):
         root = etree.HTML(self.content)
         news_txt_nodes = root.xpath('//div[@class="newscontent"]/div[@class="news_txt"]')
-        img_nodes = news_txt_nodes[0].xpath('.//img[@src]')
+        try:
+            img_nodes = news_txt_nodes[0].xpath('.//img[@src]')
+        except IndexError:
+            print 'Page content for img not expected'
+            return
         for idx, img_node in enumerate(img_nodes):
             img_url = img_node.attrib['src']
             img_name = os.path.basename(img_url)
