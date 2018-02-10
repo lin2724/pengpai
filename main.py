@@ -63,7 +63,7 @@ class ScrapUrls2Content:
     def __init__(self):
         global gstLogHandle
         self.log = gstLogHandle.log
-        self.set_timeout = 60
+        self.set_timeout = 20
         pass
 
     def load_urls(self):
@@ -73,7 +73,7 @@ class ScrapUrls2Content:
         try:
             r = requests.get(url, timeout=self.set_timeout)
             return r.content
-        except requests.ConnectTimeout():
+        except requests.exceptions.ConnectTimeout:
             self.log('Timeout while parse [%s]' % url)
             return ''
             pass
@@ -170,7 +170,7 @@ class PPFrontPageNode(PPPageNode):
         start_url = 'http://www.thepaper.cn/'
         start_url = self.url
         self.content = url2content_handle.run_parse(start_url)
-        if not self.content:
+        if not len(self.content):
             return
             pass
         write_content(self.content, 'start.html')
