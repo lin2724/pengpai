@@ -76,6 +76,10 @@ class ScrapUrls2Content:
         except requests.exceptions.ConnectTimeout:
             self.log('Timeout while parse [%s]' % url)
             return ''
+        except:
+            e = sys.exc_info()
+            self.log(str(e))
+            return ''
             pass
         pass
 
