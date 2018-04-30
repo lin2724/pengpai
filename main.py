@@ -381,7 +381,7 @@ def check_if_exist(channel_unit_node, channel_node, article_node):
     folder_path = os.path.join(folder_path, list_file_node['full_name'])
     items = get_list(folder_path)
     for item in items:
-        if item['id'] == str(article_node.get_self_id()):
+        if item['full_name'] == str(article_node.get_self_id()) + article_node.get_title():
             return True
     return False
     pass
