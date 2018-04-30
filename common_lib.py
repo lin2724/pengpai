@@ -1,9 +1,112 @@
+# coding=utf-8
+# brief:通用库
+# LastModifyTime:2018-3-20
+# author:zhangzhilin/z03467
 import ConfigParser
 import os
 import time
 import threading
 import datetime
 import sys
+import signal
+import thread
+
+
+class LogHandle:
+    def __init__(self, log_file_path):
+        self.m_set_max_log_size = 5*1024*1024
+        self.m_set_flush_tic = 0
+        self.m_set_flush_time_rec = 0
+        self.m_set_flush_max_line = 5
+        self.m_set_flush_max_time = 5
+
+        self.m_set_max_bk_log = 0
+        if os.path.isabs(log_file_path):
+            self.set_log_file_path = log_file_path
+        else:
+            self.set_log_file_path = os.path.join(os.getcwd(), log_file_path)
+        self.mutex = threading.RLock()
+
+        log_file_folder = os.path.dirname(log_file_path)
+        try:
+            if log_file_folder and not os.path.exists(log_file_folder):
+                os.mkdir(log_file_folder)
+            self.log_fd = open(log_file_path, 'a+', os.O_APPEND)
+        except IOError:
+            print 'Failed to open logfile [%s]' % log_file_path
+            pass
+        pass
+
+    def get_log_name(self, idx):
+        if 0 == idx:
+            return self.set_log_file_path
+        if idx > self.m_set_max_bk_log:
+            return None
+        return self.set_log_file_path + ('%02d' %idx)
+        pass
+
+    def move_log_to_next(self, cur_idx):
+        cur_log_name = self.get_log_name(cur_idx)
+        next_log_name = self.get_log_name(cur_idx + 1)
+        if None == next_log_name:
+            # print 'Log remove [%s]' % cur_log_name
+            os.remove(cur_log_name)
+            return
+        if os.path.exists(next_log_name):
+            self.move_log_to_next(cur_idx + 1)
+        # print 'Log rename [%s] [%s]' % (cur_log_name, next_log_name)
+        os.rename(cur_log_name, next_log_name)
+        return
+        pass
+
+    def switch_log_file(self):
+        self.log_fd.close()
+        self.move_log_to_next(0)
+        self.log_fd = open(self.set_log_file_path, 'a+', os.O_APPEND)
+        self.m_set_flush_tic = 0
+        self.m_set_flush_time_rec = time.time()
+        pass
+
+    def set_bk_log_cnt(self, cnt):
+        self.m_set_max_bk_log = cnt
+
+    def log(self, log_str, silent=False):
+        # silent=True 则不输出log到屏幕
+        self.mutex.acquire()
+        try:
+            cur_time = datetime.datetime.today()
+            # cur_date= get_cur_date()
+            time_str = str(cur_time) + '  '
+            self.log_fd.write(time_str)
+            self.log_fd.write(log_str)
+            if not silent:
+                print log_str
+            self.log_fd.write('\n')
+        except:
+            e = sys.exc_clear()
+            print 'Failed to log [%s]' % str(e)
+
+        if self.log_fd.tell() > self.m_set_max_log_size:
+            self.switch_log_file()
+        self.m_set_flush_tic += 1
+        if self.m_set_flush_tic >= self.m_set_flush_max_line:
+            self.m_set_flush_tic = 0
+            self.log_fd.flush()
+        if time.time() - self.m_set_flush_time_rec >= self.m_set_flush_max_time:
+            self.m_set_flush_time_rec = time.time()
+            self.m_set_flush_tic = 0
+            self.log_fd.flush()
+        self.mutex.release()
+
+    def write_only(self, log_str):
+        self.log_fd.write(log_str)
+        self.log_fd.write('\n')
+        pass
+
+    def write(self, log_str):
+        pass
+
+gstLoghandler = LogHandle('common_lib.log')
 
 
 class CfgParse(ConfigParser.ConfigParser):
@@ -11,19 +114,20 @@ class CfgParse(ConfigParser.ConfigParser):
         ConfigParser.ConfigParser.__init__(self)
         self.cfg_file_path = cfg_file_path
         if not os.path.exists(cfg_file_path):
-            print 'cfg file not exist'
+            gstLoghandler.log('cfg file not exist')
             self.create_default_cfg()
         self.readfp(open(cfg_file_path))
+        self.log = gstLoghandler.log
         pass
 
     def create_default_cfg(self):
-        print 'create default configure file'
+        gstLoghandler.log('create default configure file')
         with open(self.cfg_file_path, 'w+') as fd:
             pass
         pass
 
     def fill_default_cfg(self, default_cfg):
-        print 'fill cfg with default set'
+        self.log('fill cfg with default set')
         with open(self.cfg_file_path, 'w+') as fd:
             fd.write(default_cfg)
         self.readfp(open(self.cfg_file_path))
@@ -36,6 +140,209 @@ class CfgParse(ConfigParser.ConfigParser):
         return False
         pass
     pass
+
+
+class ThreadHandler(object):
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.m_quit_flag = False
+        self.m_set_work_thread_cnt = 1
+        # 保持线程个数 如果有work线程挂掉 重新增加新的work线程
+        self.m_set_keep_thread_alive = False
+        self.m_running_thread_cnt = 0
+        self.m_running_work_thread_cnt = 0
+
+        self.m_load_task_done = False
+        self.m_task_list = list()
+
+        self.log = gstLoghandler.log
+
+        signal.signal(signal.SIGINT, self.ctrl_c_signal_handler)
+
+        pass
+
+    def ctrl_c_signal_handler(self, signal, frame):
+        self.stop()
+
+    def work_thread(self):
+        while True:
+            time.sleep(5)
+            self.log('Thread run...')
+            if self.m_quit_flag:
+                break
+        pass
+
+    def _work_thread(self, func=None):
+        self.m_running_thread_cnt += 1
+        if func is None:
+            # 单独为work线程计数
+            self.m_running_work_thread_cnt += 1
+        try:
+            if func is not None:
+                func()
+            else:
+                self.work_thread()
+        except:
+            self.log('Thread Failed on Exception')
+            self.log(str(sys.exc_info()))
+        if func is None:
+            self.m_running_work_thread_cnt -= 1
+        self.m_running_thread_cnt -= 1
+        pass
+
+    def _manage_thread(self):
+        self.m_running_thread_cnt += 1
+        time.sleep(5)
+        while True:
+            if self.m_quit_flag:
+                break
+            if self.m_set_keep_thread_alive:
+                if self.m_running_work_thread_cnt < self.m_set_work_thread_cnt:
+                    cnt = self.m_set_work_thread_cnt - self.m_running_work_thread_cnt
+                    for i in range(cnt):
+                        pro = threading.Thread(target=self._work_thread)
+                        pro.setDaemon(True)
+                        pro.start()
+                    self.log('Keep Thread Alive Flag is set, so start new work thread cnt [%d]' % cnt)
+            time.sleep(3)
+        self.m_running_thread_cnt -= 1
+        pass
+
+    def set_work_thread_cnt(self, cnt):
+        self.m_set_work_thread_cnt = cnt
+        pass
+
+    def start_one_thread(self, func):
+        pro = threading.Thread(target=self._work_thread, args=(func,))
+        pro.setDaemon(True)
+        pro.start()
+        pass
+
+    def get_one_task(self):
+        self.lock.acquire()
+        if not len(self.m_task_list):
+            self.lock.release()
+            return None
+        task = self.m_task_list.pop()
+        self.lock.release()
+        return task
+
+    def add_tasks(self, tasks):
+        self.lock.acquire()
+        if type(tasks) == list:
+            for task in tasks:
+                self.m_task_list.append(task)
+                self.log('Add task [%s]' % task.get_column_value('url'))
+        else:
+            self.m_task_list.append(tasks)
+        self.lock.release()
+        pass
+
+    def do_start(self):
+        pass
+
+    def do_stop(self):
+        pass
+
+    def start(self):
+        self.log('Start thread')
+        for i in range(self.m_set_work_thread_cnt):
+            pro = threading.Thread(target=self._work_thread)
+            pro.setDaemon(True)
+            pro.start()
+        # 启动一个内部的manage管理线程
+        pro = threading.Thread(target=self._manage_thread)
+        pro.setDaemon(True)
+        pro.start()
+        self.do_start()
+        pass
+
+    def stop(self):
+        self.m_quit_flag = True
+        self.log('Stop Thread')
+        while True:
+            if self.m_running_thread_cnt == 0:
+                self.log('All thread Quit')
+                break
+            else:
+                self.log('Wait, Running Thread Cnt [%d]' % self.m_running_thread_cnt)
+            time.sleep(3)
+        self.do_stop()
+        self.log('Stoped')
+        pass
+
+
+class ThreadItem:
+    def __init__(self):
+        self.m_thread_id = thread.get_ident()
+        self.m_last_alive_tic = time.time()
+        self.m_data = ''
+        pass
+
+    def __str__(self):
+        return 'id [%d], thread [%d] data[%s]' % (id(self), self.m_thread_id, str(self.m_data))
+
+    def set_data(self, data):
+        self.m_data = data
+
+    def get_data(self):
+        return self.m_data
+
+
+class ThreadIsolateItem:
+    # 这个主要用于多线程对同一个实例的使用
+    # 为了节省内存 通常多线程公用一个实例 但同时每个线程又都希望更改该实例的某些变量，
+    # 于是该class对变量提供set和get 每个线程set和get变量只在该线程内生效，其他线程不影响
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.data_dict = dict()
+        self.log = gstLoghandler.log
+        pass
+
+    def set_thread_item(self, name, data):
+        # for muti thread
+        thread_id = thread.get_ident()
+        thread_item_finded = None
+        self.lock.acquire()
+        if self.data_dict.has_key(name):
+            for thread_item in self.data_dict[name]:
+                if thread_item.m_thread_id == thread_id:
+                    thread_item_finded = thread_item
+                    thread_item.m_last_alive_tic = time.time()
+                    break
+            pass
+        else:
+            self.data_dict[name] = list()
+        # check timeout alive
+        for idx, thread_item in enumerate(self.data_dict[name]):
+            time_val = time.time() - thread_item.m_last_alive_tic
+            if time_val >= 60:
+                self.data_dict[name].pop(idx)
+                break
+        if thread_item_finded is None:
+            thread_item_finded = ThreadItem()
+            self.data_dict[name].append(thread_item_finded)
+        thread_item_finded.m_data = data
+        self.lock.release()
+        pass
+
+    def get_thread_item(self, name):
+        thread_id = thread.get_ident()
+        ret_data = 'not found'
+        find_flag = False
+        if self.data_dict.has_key(name):
+            self.lock.acquire()
+            for thread_item in self.data_dict[name]:
+                if thread_item.m_thread_id == thread_id:
+                    ret_data = thread_item.m_data
+                    thread_item.m_last_alive_tic = time.time()
+                    find_flag = True
+            self.lock.release()
+        if not find_flag:
+            self.log('Failed to find item [%s]' % name)
+            pass
+        return ret_data
+        pass
 
 
 class ConColor:
@@ -305,54 +612,18 @@ def scan_new_files_v2(scan_folder, time_gap, scan_depth=1000):
     pass
 
 
-class LogHandle:
-    def __init__(self, log_file_path):
-        self.set_max_log_size = 5*1024*1024
-        self.set_log_file_path = log_file_path[:]
-        self.set_log_file_path_bk = self.set_log_file_path + '-bk'
-        self.mutex = threading.Lock()
+def thread_2():
+    for i in range(5):
+        print 'Hi'
+        time.sleep(2)
+    pass
 
-        log_file_folder = os.path.dirname(log_file_path)
-        try:
-            if log_file_folder and not os.path.exists(log_file_folder):
-                os.mkdir(log_file_folder)
-            self.log_fd = open(log_file_path, 'a+', os.O_APPEND)
-        except IOError:
-            print 'Failed to open logfile [%s]' % log_file_path
-            pass
-        pass
+def test_thread():
+    thread_handler = ThreadHandler()
+    thread_handler.start()
+    thread_handler.start_one_thread(thread_2)
+    time.sleep(20)
+    pass
 
-    def switch_log_file(self):
-        self.mutex.acquire()
-        if os.path.exists(self.set_log_file_path_bk):
-            os.remove(self.set_log_file_path_bk)
-        self.log_fd.close()
-        os.rename(self.set_log_file_path, self.set_log_file_path_bk)
-        self.log_fd = open(self.set_log_file_path, 'a+', os.O_APPEND)
-        self.mutex.release()
-        pass
-
-    def log(self, log_str):
-        self.mutex.acquire()
-        try:
-            cur_time = datetime.datetime.today()
-            # cur_date= get_cur_date()
-            time_str = str(cur_time) + '  '
-            self.log_fd.write(time_str)
-            self.log_fd.write(log_str)
-            print log_str
-            self.log_fd.write('\n')
-        except:
-            e = sys.exc_clear()[0]
-            print 'Failed to log [%s]' % e
-        self.mutex.release()
-        if self.log_fd.tell() > self.set_max_log_size:
-            self.switch_log_file()
-
-    def write_only(self, log_str):
-        self.log_fd.write(log_str)
-        self.log_fd.write('\n')
-        pass
-
-    def write(self, log_str):
-        pass
+if __name__ == '__main__':
+    test_thread()
