@@ -8,6 +8,8 @@ from lxml import html
 from io import StringIO
 from openpyxl import Workbook
 from openpyxl import load_workbook
+from sqlite_util import DBHandler
+from sqlite_util import DBRowHuaBan
 
 def clean_str(str_line):
     pattern = '\s*(?P<content>.*)'
@@ -82,7 +84,9 @@ def get_info_from_content(article_content):
 
 
 class SaverXLSX:
-    def __init__(self, file_path):
+    def __init__(self, file_path=''):
+        if not file_path.endswith('.xlsx') or not file_path.endswith('.xls'):
+            file_path += '.xls'
         self.file_path = file_path
         if os.path.exists(file_path):
             self.wb = load_workbook(filename=file_path)
@@ -108,6 +112,27 @@ class SaverXLSX:
                        row_dict['comments_count'],
                        row_dict['thumb_up_count']])
         pass
+
+
+class SaverDB:
+    def __init__(self):
+        self.handler = DBHandler()
+        self.handler.load('PengPai.db')
+        self.handler.add_table('PengPai')
+        pass
+
+    def insert_info(self, row_dict):
+        huaban_row = DBRowHuaBan()
+        huaban_row.item_list[0].value = row_dict['title']
+        huaban_row.item_list[1].value = row_dict['auth']
+        huaban_row.item_list[2].value = row_dict['key_word']
+        huaban_row.item_list[3].value = row_dict['from_src']
+        huaban_row.item_list[4].value = row_dict['article_time']
+        huaban_row.item_list[5].value = 0 # int(row_dict['comments_count'])
+        huaban_row.item_list[6].value = 0 # int(row_dict['thumb_up_count'])
+        self.handler.insert_row(huaban_row)
+        pass
+
 
 
 def do_test(file_path):
@@ -137,16 +162,20 @@ def get_all_file_list(folder_path):
 
 def do_parser_info(folder_path, xlsx_name):
     saver = SaverXLSX(xlsx_name)
+    DBSaver = SaverDB()
     html_list = get_all_file_list(folder_path)
     for html_file in html_list:
         with open(html_file, 'r') as fd:
             content = fd.read()
             row_dict = get_info_from_content(content)
             saver.insert_row(row_dict)
+            DBSaver.insert_info(row_dict)
     saver.quit()
+
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
+        print 'Usage:python %s article_folder xls_file_name'
         get_all_file_list(sys.argv[1])
         exit(0)
         do_test_save(sys.argv[1])
