@@ -112,6 +112,7 @@ class PPPageNode:
         self.title = ''
         self.url = ''
         self.parent_node = None
+        self.log = gstLogHandle.log
         pass
 
     def do_parse(self):
@@ -191,7 +192,7 @@ class PPFrontPageNode(PPPageNode):
                     channel_unit_node.init_node(url, title)
                     self.add_sub_node(channel_unit_node)
                 except IndexError:
-                    print 'Page content not expected at [%s]' % start_url
+                    gstLogHandle.log('Page content not expected at [%s]' % start_url)
                     continue
             else:
                 continue
@@ -223,11 +224,11 @@ class PPChannelPageNode(PPPageNode):
         while True:
             channel_id = self.get_self_id()
             start_url = 'http://www.thepaper.cn/load_index.jsp?nodeids=%s&pageidx=%d' % (channel_id, page_id)
-            print start_url
+            self.log(start_url)
             url2content_handle = ScrapUrls2Content()
             content = url2content_handle.run_parse(start_url)
             if not len(content):
-                print 'All article list get done, total article [%d]' % len(self.get_sub_nodes())
+                self.log('All article list get done, total article [%d]' % len(self.get_sub_nodes()))
                 break
             root = etree.HTML(content)
             nodes = root.xpath('//div[@class="news_li"]/h2/a')
@@ -254,15 +255,15 @@ class PPChannelPageNode(PPPageNode):
 class PPArticlePageNode(PPPageNode):
     def do_parse(self):
         if check_if_exist(self.get_parent_node().get_parent_node(), self.get_parent_node(), self):
-            print 'Already exist, skip [%s]' %self.url
+            self.log('Already exist, skip [%s]' %self.url)
             return True
         start_url = self.url
         #start_url = 'http://www.thepaper.cn/newsDetail_forward_1742361'
-        print start_url
+        self.log(start_url)
         url2content_handle = ScrapUrls2Content()
         self.content = url2content_handle.run_parse(start_url)
         if not len(self.content):
-            print 'Empty content'
+            self.log('Empty content')
             return False
         root = etree.HTML(self.content)
         title_node = root.xpath('//div[@class="newscontent"]/h1[@class="news_title"]')
@@ -292,7 +293,7 @@ class PPArticlePageNode(PPPageNode):
         try:
             img_nodes = news_txt_nodes[0].xpath('.//img[@src]')
         except IndexError:
-            print 'Page content for img not expected'
+            self.log('Page content for img not expected')
             return
         for idx, img_node in enumerate(img_nodes):
             img_url = img_node.attrib['src']
@@ -332,7 +333,7 @@ def do_test_get_channels():
             sub_dict['url'] = list_node.attrib['href']
             sub_dict['title'] = list_node.text
             item['subs'].append(sub_dict)
-            print list_node.text, list_node.attrib['href']
+            gstLogHandle.log(list_node.text + list_node.attrib['href'])
 
     write_content(str(ret_list), 'items.txt')
     return ret_list
@@ -410,7 +411,7 @@ def store_new_article(channel_unit_node, channel_node, article_node):
         with open(file_name, 'w+') as fd:
             fd.write(article_node.get_content())
     except:
-        print 'ERROR: Failed to store new article [%s]' % str(sys.exc_info())
+        gstLogHandle.log('ERROR: Failed to store new article [%s]' % str(sys.exc_info()))
 
 
 def store_new_article_file(channel_unit_node, channel_node, article_node, file_name, content):
@@ -436,7 +437,7 @@ def store_new_article_file(channel_unit_node, channel_node, article_node, file_n
         with open(full_file_path, 'wb+') as fd:
             fd.write(content)
     except :
-        print 'ERROR: Failed to store new article file'
+        gstLogHandle.log('ERROR: Failed to store new article file')
 
 
 # front-page  channel-unit  channel  article-list-in-channel
@@ -445,7 +446,7 @@ def store_new_article_file(channel_unit_node, channel_node, article_node, file_n
 def choose_node(node, input_idx=None):
     sub_nodes = node.get_sub_nodes()
     for idx, sub_node in enumerate(sub_nodes):
-        print(str(idx) + ':' + sub_node.get_title())
+        gstLogHandle.log(str(idx) + ':' + sub_node.get_title())
     if not len(sub_nodes):
         gstLogHandle.log('ERROR: no channel found...')
         return None
@@ -462,7 +463,7 @@ def choose_node(node, input_idx=None):
                     return None
                 gstLogHandle.log('wrong choice! try again.')
                 continue
-            print('choose [%d]:[%s]' % (num, sub_nodes[num].get_title()))
+                gstLogHandle.log('choose [%d]:[%s]' % (num, sub_nodes[num].get_title()))
             break
         except ValueError:
             gstLogHandle.log('Please input number..')
@@ -505,7 +506,7 @@ def main():
             exit(1)
         channel_node.do_parse()
         article_nodes = channel_node.get_sub_nodes()
-        print 'len [%d]' % len(article_nodes)
+        gstLogHandle.log('len [%d]' % len(article_nodes))
         for article_node in article_nodes:
             article_node.do_parse()
         exit(0)
@@ -514,15 +515,15 @@ def main():
     if arg_parser.check_option('-parse_all'):
         channel_unit_nodes = front_page_node.get_sub_nodes()
         for idx, channel_unit_node in enumerate(channel_unit_nodes):
-            print('Start to get ' + str(idx) + ':' + channel_unit_node.get_title())
+            gstLogHandle.log('Start to get ' + str(idx) + ':' + channel_unit_node.get_title())
             if 0 == idx:
-                print 'Skip video channel..'
+                gstLogHandle.log('Skip video channel..')
                 continue
             for sub_idx, channel_node in enumerate(channel_unit_node.get_sub_nodes()):
                 channel_node.do_parse()
                 article_nodes = channel_node.get_sub_nodes()
-                print('Start to get ' + str(idx) + ':' + channel_node.get_title())
-                print('Total Article cnt [%d]' % len(article_nodes))
+                gstLogHandle.log('Start to get ' + str(idx) + ':' + channel_node.get_title())
+                gstLogHandle.log('Total Article cnt [%d]' % len(article_nodes))
                 for article_node in article_nodes:
                     article_node.do_parse()
         exit(0)
@@ -534,7 +535,6 @@ def main():
     channel_node = choose_node(channel_unit_node)
     channel_node.do_parse()
     article_nodes = channel_node.get_sub_nodes()
-    print len(article_nodes)
     for article_node in article_nodes:
         article_node.do_parse()
 
