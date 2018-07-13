@@ -10,6 +10,8 @@ import datetime
 import sys
 import signal
 import thread
+import subprocess
+from subprocess import PIPE
 
 
 class LogHandle:
@@ -80,7 +82,12 @@ class LogHandle:
             self.log_fd.write(time_str)
             self.log_fd.write(log_str)
             if not silent:
-                print log_str
+                try:
+                    print log_str
+                except UnicodeEncodeError:
+                    pass
+                except:
+                    print 'Failed to print log to console'
             self.log_fd.write('\n')
         except:
             e = sys.exc_clear()
@@ -151,14 +158,20 @@ class ThreadHandler(object):
         self.m_set_keep_thread_alive = False
         self.m_running_thread_cnt = 0
         self.m_running_work_thread_cnt = 0
+        self.m_self_terminated_work_thread_cnt = 0
+        # 三次ctrl+c强制退出
+        self.m_set_force_quit_cnt = 3
+        self.m_ctrl_c_cnt = 0
 
         self.m_load_task_done = False
         self.m_task_list = list()
 
         self.log = gstLoghandler.log
 
-        signal.signal(signal.SIGINT, self.ctrl_c_signal_handler)
-
+        try:
+            signal.signal(signal.SIGINT, self.ctrl_c_signal_handler)
+        except ValueError:
+            self.log('Failed to sign SIGINT, maybe in sub-thread, ignore it')
         pass
 
     def ctrl_c_signal_handler(self, signal, frame):
@@ -181,7 +194,10 @@ class ThreadHandler(object):
             if func is not None:
                 func()
             else:
-                self.work_thread()
+                ret = self.work_thread()
+                if 0 == ret:
+                    # return 0 to tell manage, work thread quit at his will
+                    self.m_self_terminated_work_thread_cnt += 1
         except:
             self.log('Thread Failed on Exception')
             self.log(str(sys.exc_info()))
@@ -198,7 +214,7 @@ class ThreadHandler(object):
                 break
             if self.m_set_keep_thread_alive:
                 if self.m_running_work_thread_cnt < self.m_set_work_thread_cnt:
-                    cnt = self.m_set_work_thread_cnt - self.m_running_work_thread_cnt
+                    cnt = self.m_set_work_thread_cnt - self.m_running_work_thread_cnt - self.m_self_terminated_work_thread_cnt
                     for i in range(cnt):
                         pro = threading.Thread(target=self._work_thread)
                         pro.setDaemon(True)
@@ -259,6 +275,7 @@ class ThreadHandler(object):
 
     def stop(self):
         self.m_quit_flag = True
+        self.m_ctrl_c_cnt += 1
         self.log('Stop Thread')
         while True:
             if self.m_running_thread_cnt == 0:
@@ -268,6 +285,9 @@ class ThreadHandler(object):
                 self.log('Wait, Running Thread Cnt [%d]' % self.m_running_thread_cnt)
             time.sleep(3)
         self.do_stop()
+        if self.m_ctrl_c_cnt > self.m_set_force_quit_cnt:
+            self.log('Force quit!!')
+            exit(0)
         self.log('Stoped')
         pass
 
@@ -529,6 +549,45 @@ class MyArgParse:
         arg_parse.add_option('-desc', 1, 'specific destination folder to copy')
         arg_parse.add_option('-p', 0, 'print default scan folder and des folder')
         return arg_parse
+        pass
+
+
+class ShellCmd:
+    def __init__(self):
+        self.m_ret = 0
+        self.m_set_poll_gap = 0.5
+        self.m_set_timeout_sec = 10
+        self.m_set_discard_buf = False
+        self.log = gstLoghandler.log
+        pass
+
+    def set_timeout(self, timeout=10):
+        self.m_set_timeout_sec = timeout
+        pass
+
+    def get_last_ret(self):
+        return self.m_ret
+
+    def run_cmd(self, args=list()):
+        pipe = subprocess.Popen(args=args, stderr=PIPE, stdin=PIPE, stdout=PIPE)
+        out = ''
+        start_time_rec = time.time()
+        while True:
+            if pipe.poll() is not None:
+                break
+            line_str = pipe.stdout.read()
+            if not self.m_set_discard_buf and not line_str:
+                out += line_str
+            time.sleep(self.m_set_poll_gap)
+            if time.time() - start_time_rec > self.m_set_timeout_sec > 0:
+                self.log('Runt command timeout [%s]' % str(args))
+                self.m_ret = -1
+                pipe.terminate()
+                return out
+        self.m_ret = pipe.returncode
+        if not self.m_set_discard_buf:
+            out += pipe.stdout.read()
+        return out
         pass
 
 
