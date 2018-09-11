@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 from sqlite_util import DBHandler
 from sqlite_util import DBRowHuaBan
 
+
 def clean_str(str_line):
     pattern = '\s*(?P<content>.*)'
     m = re.search(pattern, str_line)
@@ -19,7 +20,7 @@ def clean_str(str_line):
     return ''
 
 
-def get_info_from_content(article_content):
+def get_info_from_content(article_content, article_url=''):
     title = ''
     auth = ''
     key_word = ''
@@ -77,6 +78,7 @@ def get_info_from_content(article_content):
     ret_dict['article_time'] = article_time
     ret_dict['comments_count'] = comments_count
     ret_dict['thumb_up_count'] = thumb_up_count
+    ret_dict['url'] = article_url
     print ret_dict
     return ret_dict
 
@@ -130,9 +132,9 @@ class SaverDB:
         huaban_row.item_list[4].value = row_dict['article_time']
         huaban_row.item_list[5].value = 0 # int(row_dict['comments_count'])
         huaban_row.item_list[6].value = 0 # int(row_dict['thumb_up_count'])
+        huaban_row.item_list[7].value = row_dict['url']
         self.handler.insert_row(huaban_row)
         pass
-
 
 
 def do_test(file_path):
@@ -160,6 +162,20 @@ def get_all_file_list(folder_path):
     return ret_list
 
 
+def get_url_from_html_path(html_path):
+    file_name = os.path.basename(html_path)
+    pattern = '(?P<article_id>\d+).*'
+    m = re.search(pattern=pattern, string=file_name)
+    if m:
+        url = 'https://www.thepaper.cn/newsDetail_forward_%s' % m.group('article_id')
+        return url
+    else:
+        print 'Failed get url'
+        pass
+    return ''
+    pass
+
+
 def do_parser_info(folder_path, xlsx_name):
     saver = SaverXLSX(xlsx_name)
     DBSaver = SaverDB()
@@ -167,7 +183,7 @@ def do_parser_info(folder_path, xlsx_name):
     for html_file in html_list:
         with open(html_file, 'r') as fd:
             content = fd.read()
-            row_dict = get_info_from_content(content)
+            row_dict = get_info_from_content(content, get_url_from_html_path(html_file))
             saver.insert_row(row_dict)
             DBSaver.insert_info(row_dict)
     saver.quit()

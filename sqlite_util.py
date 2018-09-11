@@ -1,5 +1,7 @@
+# coding=utf-8
 import sqlite3
 import threading
+
 
 class DBItem:
     def __init__(self, name, type_str, is_primary=False):
@@ -100,6 +102,7 @@ class DBRowHuaBan(DBRow):
         self.item_list.append(DBItem('article_time', 'CHAR'))
         self.item_list.append(DBItem('comments_count', 'INT'))
         self.item_list.append(DBItem('thumb_up_count', 'INT'))
+        self.item_list.append(DBItem('url', 'CHAR'))
         pass
 
 
@@ -161,7 +164,10 @@ class DBHandler:
         # db_row = DBRowHuaBan()
         command = db_row.generate_insert_cmd__str(self.table_name)
         # command += ' where %s.%s != 0 ' % (self.table_name, db_row.item_list[3].name)
-        print command
+        try:
+            print command
+        except UnicodeEncodeError:
+            pass
         try:
             self.con.execute(command)
             self.con.commit()

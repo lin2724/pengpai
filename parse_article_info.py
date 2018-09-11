@@ -17,9 +17,10 @@ class ArticleInfo:
         self.source = ''
         self.editor = ''
         self.keyword = ''
+        self.content = ''
         pass
 
-    def init_all(self, article_id, title, about, time, source, editor, keyword):
+    def init_all(self, article_id, title, about, time, source, editor, keyword, content):
         self.article_id = article_id
         self.title = title[:]
         self.about = about[:]
@@ -27,6 +28,7 @@ class ArticleInfo:
         self.source = source[:]
         self.editor = editor[:]
         self.keyword = keyword[:]
+        self.keyword = content[:]
         pass
 
 
@@ -43,7 +45,8 @@ class InfoParser:
                               self.time(content),
                               self.source(content),
                               self.news_editor(content),
-                              self.news_keyword(content))
+                              self.news_keyword(content),
+                              content)
         return article_info
         print self.title(content)
         print self.news_about(content)
@@ -171,6 +174,7 @@ def collect_all_info(dict_list):
             store_info(dict_info)
     pass
 
+
 def store_info(dict_item):
     article_info = dict_item
     store_file_name = 'info.txt'
@@ -185,6 +189,7 @@ def store_info(dict_item):
                  + article_info.source.encode('utf-8') + '\t'
                  + article_info.editor.encode('utf-8')  + '\t'
                  + article_info.keyword.encode('utf-8') + '\n')
+
 
 def test():
     new_info_parser = InfoParser()
