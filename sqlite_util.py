@@ -103,6 +103,7 @@ class DBRowHuaBan(DBRow):
         self.item_list.append(DBItem('comments_count', 'INT'))
         self.item_list.append(DBItem('thumb_up_count', 'INT'))
         self.item_list.append(DBItem('url', 'CHAR'))
+        self.item_list.append(DBItem('character_cnt', 'INT'))
         pass
 
 

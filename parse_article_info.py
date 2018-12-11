@@ -18,9 +18,10 @@ class ArticleInfo:
         self.editor = ''
         self.keyword = ''
         self.content = ''
+        self.character_cnt=0
         pass
 
-    def init_all(self, article_id, title, about, time, source, editor, keyword, content):
+    def init_all(self, article_id, title, about, time, source, editor, keyword, character_count, content):
         self.article_id = article_id
         self.title = title[:]
         self.about = about[:]
@@ -28,6 +29,7 @@ class ArticleInfo:
         self.source = source[:]
         self.editor = editor[:]
         self.keyword = keyword[:]
+        self.character_cnt = character_count
         self.keyword = content[:]
         pass
 
@@ -46,6 +48,7 @@ class InfoParser:
                               self.source(content),
                               self.news_editor(content),
                               self.news_keyword(content),
+                              self.new_character_count(content),
                               content)
         return article_info
         print self.title(content)
@@ -119,6 +122,10 @@ class InfoParser:
         else:
             return nodes[0].text.strip().strip(u'关键词 >>')
         return 'No keyword'
+        pass
+
+    def new_character_count(self, content):
+        return len(content.decode('utf-8'))
         pass
 
     def get_node_text_recurise(self, nodes):

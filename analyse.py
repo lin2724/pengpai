@@ -20,6 +20,20 @@ def clean_str(str_line):
     return ''
 
 
+def get_artical_length_from_html(html_content):
+    content_length = 0
+    pattern = "\<div class=\'contheight\'\>\</div\>(?P<content>[\s\S]*?<br />)"
+    m = re.findall(pattern=pattern, string=html_content)
+    if m:
+        print 'find [%d]' % len(m)
+        for line in m:
+            for s in line.decode('utf-8'):
+                if s > '~' or s < ' ':
+                    content_length += 1
+    return content_length
+    pass
+
+
 def get_info_from_content(article_content, article_url=''):
     title = ''
     auth = ''
@@ -69,6 +83,8 @@ def get_info_from_content(article_content, article_url=''):
     else:
         print 'command not found'
 
+    character_cnt = get_artical_length_from_html(article_content)
+
     ret_dict = dict()
 
     ret_dict['title'] = title
@@ -79,6 +95,7 @@ def get_info_from_content(article_content, article_url=''):
     ret_dict['comments_count'] = comments_count
     ret_dict['thumb_up_count'] = thumb_up_count
     ret_dict['url'] = article_url
+    ret_dict['character_cnt'] = character_cnt
     print ret_dict
     return ret_dict
 
@@ -99,7 +116,8 @@ class SaverXLSX:
             self.do_init_xlsx()
 
     def do_init_xlsx(self):
-        self.ws.append(['title', 'auth', 'key_word', 'from_src', 'article_time', 'comments_count', 'thumb_up_count'])
+        self.ws.append(['title', 'auth', 'key_word', 'from_src', 'article_time', 'comments_count', 'thumb_up_count',
+                        'character_cnt'])
         pass
 
     def quit(self):
@@ -112,7 +130,8 @@ class SaverXLSX:
                        row_dict['from_src'],
                        row_dict['article_time'],
                        row_dict['comments_count'],
-                       row_dict['thumb_up_count']])
+                       row_dict['thumb_up_count'],
+                        row_dict['character_cnt']])
         pass
 
 
@@ -133,6 +152,7 @@ class SaverDB:
         huaban_row.item_list[5].value = 0 # int(row_dict['comments_count'])
         huaban_row.item_list[6].value = 0 # int(row_dict['thumb_up_count'])
         huaban_row.item_list[7].value = row_dict['url']
+        huaban_row.item_list[8].value = row_dict['character_cnt']
         self.handler.insert_row(huaban_row)
         pass
 
