@@ -10,6 +10,10 @@ from openpyxl import Workbook
 from openpyxl import load_workbook
 from sqlite_util import DBHandler
 from sqlite_util import DBRowHuaBan
+from common_lib import MyArgParse
+from common_lib import LogHandle
+
+gstLogHandler = LogHandle('pengpai.log')
 
 
 def clean_str(str_line):
@@ -20,17 +24,44 @@ def clean_str(str_line):
     return ''
 
 
+def match_article_content(content):
+    pattern = '^\s(?P<head>\<[A-z]+ ).*'
+    m = re.match(pattern=pattern, string=content)
+    if m:
+        head = m.group('head')
+        full_pattern = pattern = '^\s(?P<head>\<%s+ ).*?\</%s\>(?P<rest_content>.*)' % (head, head)
+        m = re.match(full_pattern, string=content)
+        if not m:
+            print 'Wrong pattern'
+            return False, None, False
+        rest_content = m.group('rest_content')
+        return True, rest_content, False
+    else:
+        pattern = '^(?<![<]>)'
+
+
 def get_artical_length_from_html(html_content):
     content_length = 0
-    pattern = "\<div class=\'contheight\'\>\</div\>(?P<content>[\s\S]*?<br />)"
-    m = re.findall(pattern=pattern, string=html_content)
-    if m:
-        print 'find [%d]' % len(m)
-        for line in m:
-            for s in line.decode('utf-8'):
-                if s > '~' or s < ' ':
-                    content_length += 1
-    return content_length
+    article_content = ''
+    pattern_list = list()
+    pattern = "<div\s+class=\"news_txt\"\s+data-size=\"standard\">(?P<content>[\s\S]*?<br />)"
+    pattern_list.append(pattern)
+    if '<div class="contheight"></div>' in html_content:
+        pattern = "<div\s+class=\"news_txt\"\s+data-size=\"standard\">(?P<content>[\s\S]*?<br />)"
+        pattern_list.append(pattern)
+    else:
+        pattern = "\<div class=\'contheight\'\>\</div\>(?P<content>[\s\S]*?)<div\s+class=\"news_editor\">"
+        pattern_list.append(pattern)
+    for pattern in pattern_list:
+        m = re.findall(pattern=pattern, string=html_content)
+        if m:
+            print 'find [%d]' % len(m)
+            for line in m:
+                for s in line.decode('utf-8'):
+                    if s > '~' or s < ' ':
+                        content_length += 1
+                        article_content += s
+    return content_length, article_content
     pass
 
 
@@ -83,7 +114,7 @@ def get_info_from_content(article_content, article_url=''):
     else:
         print 'command not found'
 
-    character_cnt = get_artical_length_from_html(article_content)
+    character_cnt, article_content = get_artical_length_from_html(article_content)
 
     ret_dict = dict()
 
@@ -96,6 +127,7 @@ def get_info_from_content(article_content, article_url=''):
     ret_dict['thumb_up_count'] = thumb_up_count
     ret_dict['url'] = article_url
     ret_dict['character_cnt'] = character_cnt
+    ret_dict['article_content'] = article_content
     print ret_dict
     return ret_dict
 
@@ -157,6 +189,25 @@ class SaverDB:
         pass
 
 
+class SaverContentText:
+    def __init__(self, save_file_path='article_content.txt'):
+        self.log = gstLogHandler.log
+        self.m_set_save_file_path = save_file_path
+        self.m_set_fd = open(self.m_set_save_file_path, 'w+')
+        self.log('save all article txt to [%s]' % self.m_set_save_file_path)
+        pass
+
+    def insert_info(self, row_dict):
+        info_line = '\n\nurl:[%s]\ntitle[%s] auth[%s] keyword[%s] from[%s] time[%s]\n' \
+                    % (row_dict['url'],row_dict['title'], row_dict['auth'], row_dict['key_word'], row_dict['from_src'], row_dict['article_time'])
+        self.m_set_fd.write(info_line.encode('utf-8'))
+        self.m_set_fd.write(row_dict['article_content'].encode('utf-8'))
+        pass
+
+    def quit(self):
+        self.m_set_fd.close()
+
+
 def do_test(file_path):
     with open(file_path, 'r') as fd:
         content = fd.read()
@@ -199,6 +250,7 @@ def get_url_from_html_path(html_path):
 def do_parser_info(folder_path, xlsx_name):
     saver = SaverXLSX(xlsx_name)
     DBSaver = SaverDB()
+    ContentSaver = SaverContentText()
     html_list = get_all_file_list(folder_path)
     for html_file in html_list:
         with open(html_file, 'r') as fd:
@@ -206,8 +258,17 @@ def do_parser_info(folder_path, xlsx_name):
             row_dict = get_info_from_content(content, get_url_from_html_path(html_file))
             saver.insert_row(row_dict)
             DBSaver.insert_info(row_dict)
+            ContentSaver.insert_info(row_dict)
     saver.quit()
 
+
+def init_argparser():
+    arg_parse = MyArgParse()
+    arg_parse.add_option('-savecontent', 1, 'save all content to a file')
+    arg_parse.add_option('-d', 1, 'folder where articles are stored')
+    arg_parse.add_option('-h', 0, 'print help')
+    return arg_parse
+    pass
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
